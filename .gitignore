@@ -50,3 +50,15 @@ rsconnect/
 
 .env
 *.env
+# token files
+*.token
+*token*
+# credentials files
+*.credentials
+*.key
+*.crt
+*.pem
+
+*.Rproj
+
+exercise_01/data/t2_reports_data/*
