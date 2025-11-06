@@ -59,6 +59,6 @@ rsconnect/
 *.crt
 *.pem
 
-*.Rproj
+# *.Rproj
 
 exercise_01/data/t2_reports_data/*
