@@ -1,0 +1,109 @@
+---
+title: "Reports summary"
+author: "Jessica LS"
+format:
+  html:
+    toc: true
+editor: visual
+params:
+  country_code: "VU"
+  user_name: "jessicals@spc.int"
+  reports
+output:
+  html_document:
+    df_print: paged
+---
+
+## Reports available for `r params$country_code`
+
+```{r, echo = FALSE, warning=FALSE, quiet = TRUE, include = FALSE, message=FALSE}
+
+country_code <- params$country_code
+user_name <- params$user_name
+
+# Load libraries:::::::::::::::::::::::::::::::::::::::::::::::::::::::::: ####
+
+library("tidyverse")
+library("tidyr")
+library("viridis")
+library("data.table")
+library("stringr")
+library("DT")
+
+all_reports_with_attrs <- read.csv("./all_reports_with_attrs.csv")
+
+```
+
+The table below shows the `r nrow(all_reports_with_attrs)` reports available for `r params$country_code`.
+
+```{r, echo = FALSE, warning=FALSE, quiet = TRUE, message=FALSE}
+
+all_reports_with_attrs <- all_reports_with_attrs |>
+                mutate(last_modified_date_time = substr(last_modified_date_time, 1,10))
+
+DT::datatable(all_reports_with_attrs |>
+                select(Id = user_report_id, Title = title, `Entered by` = entered_by,
+                       `Last modified` = last_modified_date_time))
+
+```
+
+Find below a summary of the number of reports per module and user:
+
+```{r, echo = FALSE, warning=FALSE, quiet = TRUE, message=FALSE}
+
+DT::datatable(all_reports_with_attrs |>
+                group_by(required_modules
+                         # , entered_by
+                         ) |>
+                summarise(`n` = n(), .groups = "drop") |>
+  select(Module = required_modules,
+         # `Entered by` = entered_by,
+         `Number of Reports` = n
+         ) |>
+    arrange(desc(Module)), 
+  options = list(pageLength = 25, dom = 'tip'), rownames = FALSE
+)
+
+```
+
+# Recently Updated Reports
+Here are the five most recently updated reports. Click a section below to view the SQL each report is currently using.
+
+
+```{r, echo = FALSE, warning=FALSE, quiet = TRUE, message=FALSE, results='asis'}
+
+all_reports_with_attrs_subset <- all_reports_with_attrs |>
+                arrange(desc(last_modified_date_time)) |>
+                head(5)
+
+DT::datatable(all_reports_with_attrs_subset |>
+  mutate(last_modified_date_time = substr(last_modified_date_time, 1,10)) |>
+
+  select(
+    Id = user_report_id, 
+    Title = title, 
+    Module = required_modules,
+    `Entered by` = entered_by,
+    `Last modified by` = last_modified_by,
+    `Last modified` = last_modified_date_time
+         ) |>
+    arrange(desc(`Last modified`)), 
+  options = list(pageLength = 25, dom = 'tip'), rownames = FALSE
+)
+
+```
+
+
+```{r, echo = FALSE, warning=FALSE, quiet = TRUE, message=FALSE, results='asis'}
+
+for (i in seq_len(nrow(all_reports_with_attrs_subset))) {
+  cat("::: {.callout-note collapse=true}\n")
+  cat("###", all_reports_with_attrs_subset$title[i], "\n")
+  cat("Report ID:", all_reports_with_attrs_subset$user_report_id[i], "\n\n")
+  cat("sql\n", all_reports_with_attrs_subset$sql_query[i], "\n\n")
+  cat(":::\n\n")
+}
+
+
+```
+
