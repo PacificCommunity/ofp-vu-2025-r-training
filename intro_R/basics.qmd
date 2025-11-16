@@ -1,0 +1,119 @@
+---
+title: "R Basics – SPC 2025 Vanuatu Training"
+format: 
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    theme: cosmo
+author: "Your Name"
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+# Introduction
+
+This document introduces some fundamental R concepts that will help you work with data effectively. We'll cover libraries, assignment, functions, dataframes, pipes, filtering, and selecting data.
+
+You can run the code chunks in this document using RStudio. Just click the green play button at the top right of each chunk.
+
+You can also run individual lines of code by placing your cursor on the line (or by selecting multiple lines) and pressing `Ctrl + Enter` (or `Cmd + Enter` on Mac).
+
+## 1. Libraries
+
+You can think of libraries as toolboxes that contain pre-built functions to help you do specific tasks.
+
+In [this](https://support.posit.co/hc/en-us/articles/201057987-Quick-list-of-useful-R-packages) post you can find a list of useful R packages.
+
+```{r}
+# Packages of tools others have built
+library(dplyr)   # Data manipulation
+library(stringr) # Text handling
+library(DT)      # Interactive tables
+```
+
+## 2. Assignment `<-`
+
+```{r}
+# Saving results to use later
+my_numbers <- c(5, 10, 15, 20, 25)
+## check the content of my_numbers
+
+# Q: what if I want to create a vector of characters instead?
+```
+
+## 3. Functions
+
+```{r}
+mean(my_numbers)
+max(my_numbers)
+
+# Q: what if I want to calculate the minimum value?
+```
+
+## 4. Dataframe and Pipes `|>`
+
+Chains commands together (like "then do this")
+
+```{r, echo = FALSE}
+# Sample data frame
+data <- data.frame(
+  vessel = c("A", "B", "C", "D"),
+  year = c(2023, 2024, 2024, 2023),
+  catch = c(100, 150, 200, 250)
+)
+
+data |>
+  head(2) |>
+  DT::datatable()
+
+# Q: what if I want to display the first 3 rows instead?
+```
+
+### 4.1 Read csv to a dataframe and run summarisation (group by)
+```{r, echo = FALSE}
+# load csv data to R (as a dataframe)
+csv_data <- read.csv("data/vu_3397.csv")
+
+# what if I want to see the column names?
+csv_data |>
+  colnames()
+## open the df from the global environment to see its structure
+
+# what if I want to see distinct yearmonths?
+csv_data |>
+  distinct(Yearmonth)
+
+# what if I want to see distinct vessels and yearmonths?
+csv_data |>
+  distinct(Vessels, Yearmonth)
+
+# what if I want to see the total n of trips by vessel?
+csv_data |>
+  group_by(Vessels) |>
+  summarise(total_n_trips = sum(Trips, na.rm = TRUE)) |>
+  arrange(desc(total_n_trips)) |>
+  DT::datatable()
+
+# Q: and what about if I want to know the total number of trips by vessel and yearmonth?
+
+
+```
+
+
+
+## 5. Filter and select
+
+Chains commands together (like "then do this") and use filtering commands
+
+```{r}
+data |>
+  filter(year == 2024) |> # select only 2024 data
+  select(vessel, catch)   # select specific columns
+
+# Q: what if I want to filter by year 2023 and select vessel and year columns?
+```
+
+**Reads like:** "Take data, THEN filter by year, THEN select columns"

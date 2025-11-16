@@ -1,0 +1,288 @@
+---
+title: "Retrieving Tufman 2 Data with R"
+subtitle: "SPC 2025 - Vanuatu Training"
+author: "Jessica Leiria Schattschneider"
+format: 
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    theme: cosmo
+---
+
+# Introduction
+
+Today we'll learn how to retrieve fishing data from Tufman 2. The goal is to see how R can help you access and filter data that matters to your work.
+
+**What we'll do today:**
+
+1.  Connect to Tufman 2 - you need to have a password for Tufman2
+2.  See what reports are available
+3.  Filter reports to find what we need
+4.  Download the data
+
+------------------------------------------------------------------------
+
+# Setup: Loading Our Tools
+
+First, we need to load the "tools" (libraries) that help us work with data.
+
+```{r setup, message=FALSE, warning=FALSE}
+# Clear the workspace - start fresh!
+rm(list=ls())
+
+# Load the libraries we need
+library("DT")        # For interactive tables
+library("dplyr")     # For data manipulation
+library("stringr")   # For working with text
+library("purrr")     # For data operations
+
+# Load custom functions from utils.R
+source("utils.R")
+```
+
+------------------------------------------------------------------------
+
+# Step 1: Connect to Tufman 2
+
+To access data, we need to identify ourselves. This is like logging into a website.
+
+```{r authentication}
+# Enter your details here
+
+user_name = "jessicals@spc.int" # Your username
+country_code = "VU"             # Your country code (e.g., "VU" for Vanuatu)
+
+# Load or create your access token
+token <- load_token(user_name, country_code)
+```
+
+::: callout-tip
+## 🔑 What's a token?
+
+A token is like a digital key that proves you have permission to access the data. R handles this automatically for you!
+:::
+
+------------------------------------------------------------------------
+
+# Step 2: What Reports Are Available?
+
+Let's see all the reports you have access to in Tufman 2.
+
+```{r load-reports, message=FALSE}
+# Get list of all available reports
+existing_reports <- get_list_of_t2_reports(
+  token, 
+  country_code, 
+  user_name, 
+  replace = FALSE # talk about what this is doing
+) |>
+  data.frame()
+
+# How many reports do we have access to?
+cat("Total reports available:", nrow(existing_reports), "\n")
+
+```
+
+Now let's look at them in an interactive table:
+
+```{r display-reports}
+# Create an interactive table
+DT::datatable(
+  existing_reports |>
+    dplyr::select(
+      Id = user_report_id,
+      Filters = option_labels,
+      Title = title, 
+      Description = description, 
+      `Last modified` = last_modified_date_time
+    ) |>
+    arrange(Title),
+  filter = "top",  # Adds search boxes at the top
+  options = list(
+    pageLength = 10,
+    dom = 'lftrip',
+    initComplete = JS(
+      "function(settings, json) {",
+      "$(this.api().table().header()).css({'background-color': '#000', 'color': '#fff'});",
+      "}"
+    )
+  )
+)
+```
+
+::: {.callout-note icon="false"}
+## 💭 Try This!
+
+**Use the search boxes above (or check the dataframe in your global environment, or even write some R code in a new R chunk) the table to find:**
+
+1.  How many reports can you access?
+2.  How many reports with "Part 1" in the title
+3.  Reports that mention "Longline" in the Filters
+4.  Reports modified this month (after November 1, 2025)
+
+:::
+
+------------------------------------------------------------------------
+
+# Step 3: Filter to Find What We Need
+
+We don't need all reports - just the ones relevant to our work. Let's filter!
+
+## Attempt 1: Filtering by Text
+
+Let's find reports where:
+
+-   The title contains "Part 1"
+-   AND the filters mention "Longline"
+
+```{r filter-reports-v1}
+# Convert text to lowercase and filter
+filtered_reports_v1 <- existing_reports |>
+  mutate(across(where(is.character), tolower)) |>
+  filter(
+    grepl("part 1|part1", title, ignore.case = TRUE),
+    grepl("longline", option_labels, ignore.case = TRUE)
+  )
+
+# How many did we find?
+cat("Reports matching our criteria:", nrow(filtered_reports_v1), "\n")
+
+# Show the filtered results
+filtered_reports_v1 |>
+  select(`Report id` = user_report_id, 
+         Title = title) |>
+  head() |>
+  gt::gt()
+```
+
+::: {.callout-note icon="false"}
+## 💭 Discussion Questions
+
+1.  **Why do we convert everything to lowercase before searching?**
+2.  **What does `grepl()` do? Why is it useful?**
+3.  **What if you wanted to find "ARTISANAL" reports instead? What would you change?**
+:::
+
+## Attempt 2: Filtering by Specific IDs
+
+Sometimes we know exactly which reports we want by their ID numbers:
+
+```{r filter-reports-v2}
+# Select specific reports by ID
+filtered_reports <- existing_reports |>
+  # Three reports from INTERNATIONAL WATERS
+  filter(user_report_id %in% c(3390, 3397, 3395))
+
+cat("Selected reports:", nrow(filtered_reports), "\n")
+```
+
+::: {.callout-warning icon="false"}
+## Reflection
+
+**Which filtering method is better?**
+
+-   **By text search:** More flexible, might catch reports you didn't know about
+-   **By ID:** More precise, but you need to know the IDs beforehand
+
+**When would you use each approach in your work?**
+:::
+
+------------------------------------------------------------------------
+
+# Step 4: Explore Report Attributes
+
+Before downloading data, let's see what attributes (filters/parameters) are available:
+
+```{r explore-attributes}
+# Extract all unique attributes from our filtered reports
+filtered_attrs <- filtered_reports$report_attrs |>
+  paste(collapse = ",") |>           # Combine all attributes
+  str_split(",") |>                  # Split into individual items
+  unlist() |>                        # Flatten the list
+  str_trim() |>                      # Remove extra spaces
+  discard(~ .x == "") |>             # Remove empty entries
+  unique() |>                        # Keep only unique values
+  sort()                             # Sort alphabetically
+
+# Display the attributes
+cat("Available attributes:\n")
+print(filtered_attrs)
+```
+------------------------------------------------------------------------
+
+# Step 5: Define Your Filter Values
+
+Now we tell R what specific data we want:
+
+```{r define-parameters}
+# Set the parameters for your data download
+attrs <- list(
+  flag_code = "VU",      
+  year = 2024,           # Change this to the year you want
+  min_year = 2006
+)
+
+cat("You're requesting data for :")
+for (i in 1:length(attrs)){
+  
+  cat(paste0(
+    names(attrs[i]),
+    ": ", attrs[[i]], " \n"
+  )
+  )
+
+}
+
+```
+------------------------------------------------------------------------
+
+# Step 6: Download the Data!
+
+Finally, we're ready to download our data:
+
+```{r download-data, eval=FALSE}
+# Get the report data based on our filters
+report_data <- get_reports(
+  token = token, 
+  user_name = user_name, 
+  country_code = country_code, 
+  filtered_reports = filtered_reports, 
+  attrs = attrs,
+  record_current_date = FALSE,
+  overwrite = TRUE
+)
+
+# Preview the data structure
+cat("Data downloaded successfully!\n")
+```
+
+::: {.callout-tip icon="false"}
+## What happend in the step below? Where is my data?
+
+**Where is my data?** **What does the overwrite parameter do?** **How does the downloaded data look like?** **Can I modify the tables generated in this process? Yes, but please don't do it!**
+:::
+
+::: callout-important
+## 📊 What's Next?
+
+Now that you have the data, you can:
+
+-   Create summaries and visualizations with the files you
+-   Filter it further for specific analyses
+-   Combine it with other datasets
+:::
+
+------------------------------------------------------------------------
+
+::: {.callout-note icon="false"}
+## Challenge Exercises
+
+1.  **Modify the filters** to find different types of reports (e.g., "Part 2" or "Purse Seine")
+
+2.  **Change the year parameter** to compare data from different years
+
+3.  **Select other reports** and check the attributes they require
+
+4.  **Think about your workflow:** How could this script save you time in your regular work?
+:::

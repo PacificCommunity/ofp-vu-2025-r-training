@@ -12,6 +12,7 @@ load_dot_env()
 
 # function to generate a token
 generate_token <- function(user_name, country_code){
+  
   result <- run(
     "curl",
     args = c(
@@ -52,7 +53,7 @@ generate_token <- function(user_name, country_code){
   
 }  
 
-# check if token exits and is valid, otherwise create one
+# function to check if token exits and is valid, otherwise create one
 load_token <- function(user_name, country_code){
   
   if (file.exists("token.RData")) {
@@ -77,6 +78,7 @@ load_token <- function(user_name, country_code){
   return(token)
   }
 
+# function to list the reports users have access to
 get_list_of_t2_reports <- function(token, country_code, user_name, replace = FALSE){
   
   
@@ -207,10 +209,10 @@ get_list_of_t2_reports <- function(token, country_code, user_name, replace = FAL
   
   }
 
-
+# function to get the data from selected reports
 get_reports <- function(token, user_name, country_code, filtered_reports, attrs,
                         base_url = "https://www.spc.int/ofp/tufman2api/api/ReportDefinition/DownloadResults",
-                        lang = "en",overwrite = TRUE){
+                        lang = "en",record_current_date = TRUE, overwrite = FALSE){
 
     reports_selected <- filtered_reports |>
       pull(title)
@@ -227,83 +229,102 @@ get_reports <- function(token, user_name, country_code, filtered_reports, attrs,
       user_id <- report_info$user_report_id
       group_by <- report_info$report_group_by
       
-      report_attr_names <- strsplit(report_info$report_attrs, ",") |> 
-        unlist() |> trimws()
       
-      # Build runParams only for attributes relevant to this report
-      params_list <- attrs[names(attrs) %in% report_attr_names]
+      # File exists? 
       
-      # Add group_by if not NA or empty
-      if (!is.null(group_by) && !is.na(group_by) && nzchar(group_by)) {
-        params_list$group_by <- group_by
+      dir.create("./data/t2_reports_data", showWarnings = FALSE, recursive = TRUE)
+      
+      if (record_current_date) {
+        filename_csv <- paste0("./data/t2_reports_data/",
+                               tolower(country_code), "_",
+                               user_id, "_", Sys.Date(), ".csv")
+      } else {
+        filename_csv <- paste0("./data/t2_reports_data/",
+                               tolower(country_code), "_",
+                               user_id, ".csv")
       }
       
-      # Convert runParams list to JSON and URL encode it
-      runParams_json <- jsonlite::toJSON(params_list, auto_unbox = TRUE)
-      runParams_encoded <- utils::URLencode(runParams_json, reserved = TRUE)
-      
-      # Build the full curl URL
-      api_url <- glue::glue(
-        "{base_url}?guid={guid}&lang={lang}&runParams={runParams_encoded}"
-      )
-      
-      ret <- run(
-        "curl",
-        args = c(
-          "-X", "GET",
-          api_url,
-          "-H", "accept: application/json, text/plain, */*'",
-          "-H", paste0("authorization: Bearer ", token),
-          "-H", "content-type: application/json",
-          "-H", paste0("tufinstance: ", country_code),
-          "-H", "tufmodule: Reports",
-          "-H", paste0("tufuser: ", user_name)
+
+      if (file.exists(filename_csv) && !overwrite) {
+        print(paste0("The csv data from report ", report_info$title,
+                     " already exists in your computer: ", filename_csv))
+        next
+      } else {
+        
+        report_attr_names <- strsplit(report_info$report_attrs, ",") |> 
+          unlist() |> trimws()
+        
+        # Build runParams only for attributes relevant to this report
+        params_list <- attrs[names(attrs) %in% report_attr_names]
+        
+        # Add group_by if not NA or empty
+        if (!is.null(group_by) && !is.na(group_by) && nzchar(group_by)) {
+          params_list$group_by <- group_by
+        }
+        
+        # Convert runParams list to JSON and URL encode it
+        runParams_json <- jsonlite::toJSON(params_list, auto_unbox = TRUE)
+        runParams_encoded <- utils::URLencode(runParams_json, reserved = TRUE)
+        
+        # Build the full curl URL
+        api_url <- glue::glue(
+          "{base_url}?guid={guid}&lang={lang}&runParams={runParams_encoded}"
         )
-      )
-      
-      if (is.null(ret$stdout) || trimws(paste(ret$stdout, collapse = "")) == "") {
-        message(
-          paste0(
-            "No data available for report: ", report_info$title,
-            " and attributes: ", as.character(runParams_json),
-            ", or your token has expired. Skipping..."
+        
+        ret <- run(
+          "curl",
+          args = c(
+            "-X", "GET",
+            api_url,
+            "-H", "accept: application/json, text/plain, */*'",
+            "-H", paste0("authorization: Bearer ", token),
+            "-H", "content-type: application/json",
+            "-H", paste0("tufinstance: ", country_code),
+            "-H", "tufmodule: Reports",
+            "-H", paste0("tufuser: ", user_name)
           )
         )
-        next
+        
+        if (is.null(ret$stdout) || trimws(paste(ret$stdout, collapse = "")) == "") {
+          message(
+            paste0(
+              "No data available for report: ", report_info$title,
+              " and attributes: ", as.character(runParams_json),
+              ", or your token has expired. Skipping..."
+            )
+          )
+          next
+        }
+        
+        if (grepl("^[{\\[]", trimws(ret$stdout))) {
+          # JSON case
+          ret_df <- jsonlite::fromJSON(paste(ret$stdout, collapse = ""), flatten = TRUE)$Rows |>
+            data.frame()
+        } else {
+          # CSV case
+          ret_df <- read.csv(text = ret$stdout, stringsAsFactors = FALSE)
+        }
+        
+        
+        if(length(ret_df) == 0){
+          print(paste0("No data available for report: ", report_info$title, " and attributes: ",
+                       as.character(runParams_json), ", skipping..."))
+          next
+        }
+        
+        ret_df <- ret_df |>
+          dplyr::mutate(
+            report_id = user_id,
+            attrs_query = runParams_json,
+            guid = guid
+          ) |>
+          dplyr::select(guid, attrs_query, dplyr::everything())
+          
+        print(paste0("Saving data from report ", report_info$title, " as csv: ", filename_csv))
+        write.csv(ret_df, file = filename_csv, row.names = FALSE)
+        
       }
       
-      if (grepl("^[{\\[]", trimws(ret$stdout))) {
-        # JSON case
-        ret_df <- jsonlite::fromJSON(paste(ret$stdout, collapse = ""), flatten = TRUE)$Rows |>
-          data.frame()
-      } else {
-        # CSV case
-        ret_df <- read.csv(text = ret$stdout, stringsAsFactors = FALSE)
-      }
-      
-      
-      if(length(ret_df) == 0){
-        print(paste0("No data available for report: ", report_info$title, " and attributes: ",
-                     as.character(runParams_json), ", skipping..."))
-        next
-      }
-
-      ret_df <- ret_df |>
-        dplyr::mutate(
-          attrs_query = runParams_json,
-          guid = guid
-        ) |>
-        dplyr::select(guid, attrs_query, dplyr::everything())
-      
-      # save to folder t2_reports_data
-      if (overwrite){
-        filename_csv <- paste0("./data/t2_reports_data/", tolower(country_code), "_", user_id, "_", Sys.Date(), ".csv")
-      }else{
-        filename_csv <- paste0("./data/t2_reports_data/", tolower(country_code), "_", user_id, "_", ".csv")
-      }
-      
-      print(paste0("Saving data from report ", report_info$title, " as csv: ", filename_csv))
-      write.csv(ret_df, file = filename_csv)
       
       api_calls[i] <- api_url
       
@@ -311,4 +332,3 @@ get_reports <- function(token, user_name, country_code, filtered_reports, attrs,
     return(api_calls)
     
 }
-  
