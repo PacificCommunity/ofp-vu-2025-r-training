@@ -20,12 +20,15 @@ This repository contains all materials used during the R portion of the training
 ### Exercises
 
   - **Exercise 01**: Downloading Data from Tufman 2
+  
   **Focus:** How can I download data from Tufman 2 reports?
 
   - **Exercise 02**: Analyzing Tufman 2 Data
+  
   **Focus:** How can I analyze data from Tufman 2 reports?
 
   - **Exercise 03**: Reproducing FFA Report Results
+  
   **Focus:** How can I reproduce the total catch and catch value results from the [FFA 2025 report](https://www.ffa.int/download/wcpfc-area-catch-value-estimates/)?
 
 ⚠️ **Note:** Exercise 03 requires sensitive data shared separately via email.
