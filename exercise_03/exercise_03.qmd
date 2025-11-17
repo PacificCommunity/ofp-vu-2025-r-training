@@ -1,0 +1,220 @@
+---
+title: "Investigating Catch totals reported in the 2024 FFA report"
+subtitle: "SPC 2025 - Vanuatu Training"
+author: "Jessica Leiria Schattschneider"
+format: 
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    theme: cosmo
+---
+
+# Situation
+
+FFA has just released the 2024 Tuna Fisheries Report. They provided information on catch totals and catch prices by country and year. We needed more information to understand the catch totals reported for Vanuatu. So, we contacted FFA and they shared the raw data used to create the report, and we identified that this data is based on the Annual Catch Estimates (ACE). 
+
+Vanuatu wants to generate their own reports with the total catch but also aggregated by vessel. SPC provided this data which is based on data from logsheets.
+
+**What we'll do:**
+
+1.  Use the raw ACE data we received from FFA to get to the catch totals reported for Vanuatu in the FFA's report
+2. Get the catch totals per vessel
+3. Compare the catch totals from FFA with the catch totals we calculated in the previous step
+
+------------------------------------------------------------------------
+
+# Setup: Loading Our Tools
+
+First, we need to load the "tools" (libraries) that help us work with data.
+
+```{r setup, message=FALSE, warning=FALSE}
+# Clear the workspace - start fresh!
+rm(list=ls())
+
+# Load the libraries we need
+library(tidyverse)
+
+```
+
+------------------------------------------------------------------------
+
+# Task 1: Get FFA's Catch Totals for Vanuatu
+
+For this task we first need to check how FFA reported the catch values. Then, we need to read the data provided by FFA and process it to check if we can get the same catch totals for Vanuatu presented in FFA's report.
+
+
+```{r, message=FALSE, warning=FALSE}
+# We are only interested in some sheets of the Excel file
+readxl::excel_sheets("data/ffa_report_2024.xlsx")
+
+# read sheet 6 and 10
+ffa_catch <- readxl::read_excel("data/ffa_report_2024.xlsx",
+                                 sheet = "6. Catch by national waters")
+
+# we are only interested in some the total catch (not per species) and for all gears
+ffa_catch_subset <- ffa_catch %>%
+  select(1, 114:ncol(ffa_catch))
+
+# rename columns
+colnames(ffa_catch_subset)[-1] <- ffa_catch_subset[3, -1]
+
+# remove extra rows till 5
+ffa_catch_subset <- ffa_catch_subset[-c(1:5), ]
+
+# I don't want anything that comes after Vanuatu (row 17)
+ffa_catch_subset <- ffa_catch_subset[1:17, ]
+
+# I now want to keep only years btw 2006 and 2025
+ffa_catch_subset <- ffa_catch_subset %>%
+  select(1, contains(as.character(2006:2025)))
+
+# I want to keep only data from Vanuatu
+ffa_catch_vanuatu <- ffa_catch_subset %>%
+  filter(`Catch by national waters` == "Vanuatu")
+
+## Read the 10th sheet - read all as text
+
+ffa_value <- readxl::read_excel("data/ffa_report_2024.xlsx",
+                                sheet = "10. Value catch nat wat", col_types = "text")
+
+# apply the same logic from above
+ffa_value_subset <- ffa_value %>%
+  select(1, 114:ncol(ffa_value))
+
+# rename columns
+colnames(ffa_value_subset)[-1] <- ffa_value_subset[3, -1]
+
+# remove extra rows till 5
+ffa_value_subset <- ffa_value_subset[-c(1:5), ]
+
+# I don't want anything that comes after Vanuatu (row 17)
+ffa_value_subset <- ffa_value_subset[1:17, ]
+
+# I now want to keep only years btw 2006 and 2025
+ffa_value_subset <- ffa_value_subset |>
+  select(1, contains(as.character(2006:2025)))
+
+# keep only Vanuatu
+ffa_value_vanuatu <- ffa_value_subset %>%
+  filter(`Value of catch by national waters` == "Vanuatu")
+
+# reshape both datasets to long format
+ffa_catch_vanuatu_long <- ffa_catch_vanuatu %>%
+  pivot_longer(-`Catch by national waters`, names_to = "Year", values_to = "catch_metric_tonnes") %>%
+  mutate(catch_metric_tonnes = as.numeric(catch_metric_tonnes))
+
+ffa_value_vanuatu_long <- ffa_value_vanuatu %>%
+  pivot_longer(-`Value of catch by national waters`, names_to = "Year", values_to = "value_usd") %>%
+  mutate(value_usd = as.numeric(value_usd))
+
+# combine both datasets
+ffa_catch_and_value <- ffa_catch_vanuatu_long %>%
+  left_join(ffa_value_vanuatu_long, by = c("Year" = "Year")) %>%
+  select(year = Year, catch_metric_tonnes, value_usd)
+
+# clean up enviroment by removing intermediate datasets
+rm(ffa_catch, ffa_catch_subset, ffa_catch_vanuatu,
+   ffa_value, ffa_value_subset, ffa_value_vanuatu,
+   ffa_catch_vanuatu_long, ffa_value_vanuatu_long)
+```
+
+
+```{r}
+
+catch_by_eez <-  read.csv("data/ace_data_provided_to_ffa.csv")
+
+# Select only columns of interest -ffa only reports catch and value for the 4 main species
+catch_by_eez_subset <- catch_by_eez |>
+  select(yr:bet_c, skj_c, yft_c)
+
+# select yr > 2006
+catch_by_eez_subset <- catch_by_eez_subset |>
+  filter(yr >= 2006)
+
+# pivot long to have sp in sp column
+catch_by_eez_long <- catch_by_eez_subset |>
+  pivot_longer(cols = c(alb_c, bet_c, skj_c, yft_c),
+               names_to = "species",
+               values_to = "catch_metric_tonnes")
+
+# we need to group by year to get total catch per year
+catch_by_eez_yr_summary <- catch_by_eez_long |>
+  group_by(yr) |>
+  summarise(catch_yr = sum(catch_metric_tonnes)) |>
+  select(year = yr, calculated_catch_metric_tonnes = catch_yr)
+
+# clean up enviroment
+rm(catch_by_eez, catch_by_eez_subset, catch_by_eez_long)
+```
+
+Now we can compare both datasets
+
+```{r compare-datasets}
+
+result <- ffa_catch_and_value |>
+  left_join(catch_by_eez_yr_summary |>
+              mutate(year = as.character(year)), by = "year")
+
+result <- result |>
+  mutate(diff_value = catch_metric_tonnes - calculated_catch_metric_tonnes)
+
+```
+
+# Task 2: Get the catch totals per vessel
+
+```{r fish-master-data}
+
+# Read data
+fish_master_data <- read.csv("data/vu_catch_month_main_sp.csv") |>
+  select(-1) |>
+  rename(
+    year = yy,
+    month = mm
+  )
+
+fish_master_data |> distinct(gear_code)
+
+
+## group by year and vessel to get total catch per vessel per year
+catch_per_vessel_year <- fish_master_data |>
+  group_by(year, vesselname) |>
+  summarise(catch_metric_tonnes = sum(tot_mt, na.rm = TRUE)) |>
+  ungroup()
+
+## group by year to get total catch per year
+catch_per_year_fish_master <- fish_master_data |>
+  group_by(year) |>
+  summarise(total_catch_metric_tonnes = sum(tot_mt, na.rm = TRUE)) |>
+  ungroup()
+
+```
+
+# Task 3: Compare the catch totals from FFA with the catch totals we calculated in the previous step
+
+```{r final-comparison}
+
+final_comparison <- result |>
+  left_join(catch_per_year_fish_master |>
+              mutate(year = as.character(year)),
+            by = "year") |>
+  rename(
+    ffa_reported_catch_metric_tonnes = catch_metric_tonnes,
+    calculated_catch_metric_tonnes_fish_master = total_catch_metric_tonnes
+  ) |>
+  mutate(
+    diff_ffa_fish_master = ffa_reported_catch_metric_tonnes - calculated_catch_metric_tonnes_fish_master
+  )
+
+
+# in column value_usd we have the total price for the catch reported by FFA in column ffa_reported_catch_metric_tonnes
+# we need to calculate the price per tonne so we can convert the difference in catch to a value difference
+
+final_comparison <- final_comparison |>
+  mutate(
+    price_per_tonne_ffa = value_usd / ffa_reported_catch_metric_tonnes,
+    value_difference_ffa_fish_master = diff_ffa_fish_master * price_per_tonne_ffa
+  )
+
+```
+
