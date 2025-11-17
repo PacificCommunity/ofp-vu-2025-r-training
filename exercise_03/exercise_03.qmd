@@ -175,7 +175,6 @@ fish_master_data <- read.csv("data/vu_catch_month_main_sp.csv") |>
 
 fish_master_data |> distinct(gear_code)
 
-
 ## group by year and vessel to get total catch per vessel per year
 catch_per_vessel_year <- fish_master_data |>
   group_by(year, vesselname) |>
@@ -218,3 +217,27 @@ final_comparison <- final_comparison |>
 
 ```
 
+# Task 4: Plot the catch values in a side by side bar plot
+
+```{r plot-catch-comparison, message=FALSE, warning=FALSE}
+library(ggplot2)
+# reshape data to long format for plotting
+plot_data <- final_comparison |>
+  select(year,
+         ffa_reported_catch_metric_tonnes,
+         calculated_catch_metric_tonnes_fish_master) |>
+  pivot_longer(-year,
+               names_to = "source",
+               values_to = "catch_metric_tonnes")
+# create side by side bar plot
+ggplot(plot_data, aes(x = year, y = catch_metric_tonnes, fill = source)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Comparison of Catch Totals: FFA Reported vs Fish Master Calculated",
+       x = "Year",
+       y = "Catch (Metric Tonnes)",
+       fill = "Source") +
+  # choose a better color pallete
+  scale_fill_brewer(palette = "Set1") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
