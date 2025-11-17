@@ -38,7 +38,8 @@ library(DT)      # Interactive tables
 
 ```{r}
 # Saving results to use later
-my_numbers <- c(5, 10, 15, 20, 25)
+my_numbers <- c(5, 10, 15, 20, 25, NA)
+my_numbers_with_na <- c(5453, NA, 343, 850, NA, 9008)
 ## check the content of my_numbers
 
 # Q: what if I want to create a vector of characters instead?
@@ -51,10 +52,14 @@ mean(my_numbers)
 max(my_numbers)
 
 # Q: what if I want to calculate the minimum value?
+
+# Q: can you now do the same (mean and max) using my_numbers_with_na?
+
 ```
 
 ## 4. Dataframe and Pipes `|>`
 
+A dataframe is the same as a table!
 Chains commands together (like "then do this")
 
 ```{r, echo = FALSE}
@@ -90,14 +95,14 @@ csv_data |>
 csv_data |>
   distinct(Vessels, Yearmonth)
 
-# what if I want to see the total n of trips by vessel?
+# what if I want to see the total number of hooks by Yearmonth?
 csv_data |>
-  group_by(Vessels) |>
-  summarise(total_n_trips = sum(Trips, na.rm = TRUE)) |>
-  arrange(desc(total_n_trips)) |>
+  group_by(Yearmonth) |>
+  summarise(total_n_hooks = sum(Hooks, na.rm = TRUE)) |>
+  arrange(desc(total_n_hooks)) |>
   DT::datatable()
 
-# Q: and what about if I want to know the total number of trips by vessel and yearmonth?
+# Q: and what about if I want to know the mean value (average) of Sets by Yearmonth and Latitude?
 
 
 ```

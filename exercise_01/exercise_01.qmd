@@ -58,7 +58,7 @@ token <- load_token(user_name, country_code)
 ```
 
 ::: callout-tip
-## 🔑 What's a token?
+## What's a token?
 
 A token is like a digital key that proves you have permission to access the data. R handles this automatically for you!
 :::
@@ -112,7 +112,7 @@ DT::datatable(
 ```
 
 ::: {.callout-note icon="false"}
-## 💭 Try This!
+## Try This!
 
 **Use the search boxes above (or check the dataframe in your global environment, or even write some R code in a new R chunk) the table to find:**
 
@@ -120,7 +120,6 @@ DT::datatable(
 2.  How many reports with "Part 1" in the title
 3.  Reports that mention "Longline" in the Filters
 4.  Reports modified this month (after November 1, 2025)
-
 :::
 
 ------------------------------------------------------------------------
@@ -140,9 +139,9 @@ Let's find reports where:
 # Convert text to lowercase and filter
 filtered_reports_v1 <- existing_reports |>
   mutate(across(where(is.character), tolower)) |>
-  filter(
-    grepl("part 1|part1", title, ignore.case = TRUE),
-    grepl("longline", option_labels, ignore.case = TRUE)
+  dplyr::filter(
+    grepl("part 1|part1", title), # , ignore.case = TRUE
+    grepl("longline", option_labels) , ignore.case = TRUE
   )
 
 # How many did we find?
@@ -157,10 +156,10 @@ filtered_reports_v1 |>
 ```
 
 ::: {.callout-note icon="false"}
-## 💭 Discussion Questions
+## Discussion Questions
 
 1.  **Why do we convert everything to lowercase before searching?**
-2.  **What does `grepl()` do? Why is it useful?**
+2.  **What does `grepl()` do? Why is it useful? Hint: use F1**
 3.  **What if you wanted to find "ARTISANAL" reports instead? What would you change?**
 :::
 
@@ -209,6 +208,7 @@ filtered_attrs <- filtered_reports$report_attrs |>
 cat("Available attributes:\n")
 print(filtered_attrs)
 ```
+
 ------------------------------------------------------------------------
 
 # Step 5: Define Your Filter Values
@@ -235,6 +235,7 @@ for (i in 1:length(attrs)){
 }
 
 ```
+
 ------------------------------------------------------------------------
 
 # Step 6: Download the Data!
@@ -264,7 +265,7 @@ cat("Data downloaded successfully!\n")
 :::
 
 ::: callout-important
-## 📊 What's Next?
+## What's Next?
 
 Now that you have the data, you can:
 

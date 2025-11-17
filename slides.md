@@ -35,7 +35,7 @@ SPC 2025 - Data Management Training
 
 # About Today's Training
 
-- **Duration:** 2 days
+- **Duration:** 1 days
 - **Format:** Hands-on, practical
 - **Goal:** Get you working with real data and have a sense of what can be done using R
 - **No pressure:** We'll go step by step
@@ -47,9 +47,6 @@ It's about seeing how R can help you do your job.
 
 # How This Training Works
 
-<div class="columns">
-<div>
-
 ### We'll Use
 
 - **Quarto document** (step-by-step guide)
@@ -57,18 +54,6 @@ It's about seeing how R can help you do your job.
 - **Live coding** (watch then try)
 - **Exercises** (practice)
 
-</div>
-<div>
-
-### You Should
-
-- Follow along
-- Ask questions anytime
-- Try the exercises
-- Don't worry about mistakes!
-
-</div>
-</div>
 
 ---
 
@@ -90,23 +75,11 @@ It's about seeing how R can help you do your job.
 
 ---
 
-# Why R is Good For Your Work
-
-- **Traceable:** Always know what you did
-- **Share methods:** Others can use your script
-- **Reproducible:** Run the same analysis anytime (consistent)
-- **Save time:** Minutes instead of hours
-- **Free:** Open-source software
-- **Efficient:** No more manual downloads
-- **Find patterns:** Easier to explore data
-
----
-
 # What is R?
 
-- A **programming language** for data
+- A **programming language** for data - write scripts
 - It is Free and Open Source
-- Like Excel, but with code and with more potential
+- Like Excel, but with code and with more potential - reproducible
 - Popular in research and science
 
 **Think of it as:** A calculator that can remember and repeat your work
@@ -132,6 +105,8 @@ It's about seeing how R can help you do your job.
 - Requires no software installation
 - Recommended for those who do not have R or RStudio installed yet
 
+**Think of it as:** watching Netflix on your browser instead of using the app.
+
 ---
 
 # .R and .qmd files
@@ -142,14 +117,26 @@ It's about seeing how R can help you do your job.
 
 ---
 
+# Why R is Good For Your Work
+
+- **Traceable:** Always know what you did
+- **Share methods:** Others can use your script
+- **Reproducible:** Run the same analysis anytime (consistent)
+- **Save time:** Minutes instead of hours
+- **Free:** Open-source software
+- **Efficient:** No more manual downloads
+- **Find patterns:** Easier to explore data
+
+---
+
 # Any Questions Before We Start?
 
 ### Common Questions:
 
-- **"What if I get stuck?"** → We'll work through it together
+- **"What if I get stuck?"** → We'll work through it together, that's part of learning!
 - **"Do I need to be good at math?"** → No!
 - **"Can I use this for other data?"** → Absolutely!
-- **"What if it doesn't work?"** → That's part of learning!
+
 
 ---
 
@@ -162,13 +149,12 @@ It's about seeing how R can help you do your job.
 1. Tufman 2 access credentials  
 
 1. Copy this training material using RStudio or Rcloud 
-    - If you have R and RStudio installed: Go to: [config Rcloud](https://github.com/PacificCommunity/ofp-vu-2025-r-training/blob/main/config/Rcloud/README.md)
-    - If you prefer to use RCloud: Go to: []
-
+    - If you have R and RStudio installed: Go to: [config Rcloud](https://github.com/PacificCommunity/ofp-vu-2025-r-training/blob/main/config/RStudio/README.md)
+    - If you prefer to use RCloud: Go to: [config Rcloud](https://github.com/PacificCommunity/ofp-vu-2025-r-training/blob/main/config/Rcloud/README.md)
 
 ---
 
-# Explore the materials available
+# Explore RCloud and the materials available
 
 ---
 
