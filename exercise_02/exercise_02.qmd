@@ -42,6 +42,7 @@ library("patchwork")  # For combining plots
 library("rnaturalearth")
 library("rnaturalearthdata")
 library("sf")
+library("mapview")
 ```
 ---
 
@@ -239,6 +240,21 @@ q <- ggplot(data_cpue_per_month, aes(x = Yearmonth)) +
 p/q
 
 ```
+
+Q: can we display the data in an interactive map (mapview)?
+
+```{r load-mapview, message=FALSE, warning=FALSE}
+# convert data to a sf object
+
+data_sf <- data |>
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326)
+
+mapview::mapview(data_sf, zcol = "Hooks")
+
+```
+
+
+
 
 Q: Can we map CPUE for that species?
 
