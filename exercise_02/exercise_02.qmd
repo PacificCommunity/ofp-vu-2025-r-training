@@ -1,0 +1,338 @@
+---
+title: "Retrieving Tufman 2 Data with R"
+subtitle: "SPC 2025 - Vanuatu Training"
+author: "Jessica Leiria Schattschneider"
+format: 
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    theme: cosmo
+---
+
+# Introduction
+
+Now that we know how to download data from Tufman 2 using R, let's analyse it!
+For this exercise we will use data from Vanuatu's Longline fleet in international waters (report 3397).
+
+**What we'll:**
+
+1. Summaries - hooks and trips and catches per month (facet)
+2. Species distribution analysis
+3. Choose the species with the highest catch and check how it varied over time
+4. CPUE analysis - catch per unit effort and mapping
+
+---
+
+# Setup: Loading Our Tools
+
+First, we need to load the "tools" (libraries) that help us work with data.
+
+```{r setup, message=FALSE, warning=FALSE}
+# Clear the workspace - start fresh!
+rm(list=ls())
+
+# Load the libraries we need
+library("DT")        # For interactive tables
+library("dplyr")     # For data manipulation
+library("stringr")   # For working with text
+library("purrr")     # For data operations
+library("tidyverse")   # For data science tools
+library("patchwork")  # For combining plots
+library("rnaturalearth")
+library("rnaturalearthdata")
+library("sf")
+```
+---
+
+# Step 0: Read the data to be analysed
+
+Read the csv file (vu_3397.csv) located in folder data
+
+```{r authentication}
+# Your turn
+data <- read.csv("data/vu_3397.csv")
+```
+
+# Step 1: Summaries
+
+## Q: Which months do we have fishing data for in 2024?
+```{r load-reports, message=FALSE}
+data %>%
+  distinct(Yearmonth) |>
+  mutate(month = gsub("2024-", "", Yearmonth)) |>
+  distinct(month) |>
+  arrange(month)
+
+```
+
+## Q: How many hooks per month?
+
+```{r display-reports}
+hooks_per_month <- data |>
+  group_by(Yearmonth) |>
+  summarise(total_hooks = sum(Hooks, na.rm = TRUE)) |>
+  arrange(Yearmonth)
+
+cat("Hooks per month:\n")
+print(hooks_per_month)
+
+```
+
+## Q: Can we plot the data generated above?
+
+```{r plot-hooks}
+
+ggplot(hooks_per_month, aes(x = Yearmonth, y = total_hooks)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Total Hooks per Month in 2024",
+       x = "Month",
+       y = "Total Hooks") +
+  theme_minimal()
+
+```
+## Q: Did we have more hooks in Jan because there were more trips?
+
+```{r trips-per-month}
+
+trips_per_month <- data |>
+  group_by(Yearmonth) |>
+  dplyr::summarise(total_trips = sum(Trips)) |>
+  arrange(Yearmonth)
+
+ggplot(trips_per_month, aes(x = Yearmonth, y = total_trips)) +
+  geom_bar(stat = "identity", fill = "darkgreen") +
+  labs(title = "Total Trips per Month in 2024",
+       x = "Month",
+       y = "Total Trips") +
+  theme_minimal()
+```
+
+
+# Step 2: Species distribution analysis
+
+Q: Can we generate a graph faceted by month for the species caught?
+
+```{r species-caught-faceted}
+
+
+# transform data for plotting - to long format
+
+data_long <- data |>
+   select(Yearmonth, AlbN, BetN, YftN, SkjN) |>
+  pivot_longer(
+    cols = c("AlbN", "BetN", "YftN", "SkjN"), 
+    names_to = "Species", 
+    values_to = "Catch_KG",
+    names_prefix = "Catch_"
+  )
+
+ggplot(data_long, aes(x = Species, y = Catch_KG)) +
+  geom_bar(stat = "identity", fill = "orange") +
+  labs(title = "Catch by Species in 2024",
+       x = "Species",
+       y = "Catch (KG)") +
+  theme_minimal() +
+  facet_wrap(~ Yearmonth)
+
+```
+Q: Instead of faceting by month, can we have in a single plot the proportion of each species caught in each month of 2024?
+
+```{r species-caught-proportion}
+
+ggplot(data_long, aes(x = Yearmonth, y = Catch_KG, fill = Species)) +
+  geom_bar(stat = "identity", position = "fill") +
+  scale_fill_brewer(palette = "Set3") +
+  labs(title = "Proportion of Catch by Species in 2024",
+       x = "Month",
+       y = "Proportion of Catch") +
+  theme_minimal()
+```
+
+# Step 3. Choose the species with the highest catch and check how it varied over time
+
+Q: Which species had the highest catch in 2024?
+
+```{r highest-catch-species}
+
+data_long |>
+  group_by(Species) |>
+  summarise(total_catch = sum(Catch_KG, na.rm = TRUE)) |>
+  arrange(desc(total_catch)) |>
+  slice(1)
+```
+Q: Can we use a scatter plot to see how the catch of that species varied over the months?
+
+```{r plot-highest-catch-species}
+
+highest_species <- data_long |>
+  group_by(Species) |>
+  summarise(total_catch = sum(Catch_KG, na.rm = TRUE)) |>
+  arrange(desc(total_catch)) |>
+  slice(1) |>
+  pull(Species)
+
+# sum of highest_species per month
+
+highest_species_data <- data_long |>
+  filter(Species == highest_species) |>
+  group_by(Yearmonth) |>
+  summarise(Catch_KG = sum(Catch_KG, na.rm = TRUE)) |>
+  arrange(Yearmonth)
+
+# plot it and plot the number of hooks on top of it
+ggplot(hooks_per_month, aes(x = Yearmonth, y = total_hooks)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_point(data = highest_species_data, aes(x = Yearmonth, y = Catch_KG), 
+             color = "darkred", size = 3, position = position_jitter(width = 0.1)) + # Scatter plot with
+  geom_line(data = highest_species_data, aes(x = Yearmonth, y = Catch_KG, group=1), 
+            color = "darkred") +
+  labs(title = "Total hooks per month Overlayed with total BE catch",
+       x = "Months",
+       y = "N hooks / BE catch") +
+  theme_minimal()
+
+```
+
+
+# Step 4: CPUE analysis - catch per unit effort and mapping
+
+Q: How can we calculate CPUE using number of hooks as effort?
+
+```{r cpue-calculation}
+# CPUE is a way to normalize catch data by the amount of effort put in.
+data_cpue_per_month <- data |>
+  group_by(Yearmonth) |>
+  summarise(
+    Hooks = sum(Hooks, na.rm = TRUE),
+    CPUE_BetN = (sum(BetN, na.rm = TRUE) / sum(Hooks, na.rm = TRUE)) * 1000, # CPUE per 1000 hooks
+    CPUE_AlbN = (sum(AlbN, na.rm = TRUE) / sum(Hooks, na.rm = TRUE)) * 1000,
+    CPUE_YftN = (sum(YftN, na.rm = TRUE) / sum(Hooks, na.rm = TRUE)) * 1000,
+    CPUE_SkjN = (sum(SkjN, na.rm = TRUE) / sum(Hooks, na.rm = TRUE)) * 1000
+  ) |>
+  select(Yearmonth, Hooks, CPUE_BetN, CPUE_AlbN, CPUE_YftN, CPUE_SkjN)
+ 
+
+head(data_cpue_per_month)
+```
+Q: Can we plot CPUE for the species with the highest catch over time and compare with the total catch?
+
+```{r plot-cpue}
+p <- ggplot(data_cpue_per_month, aes(x = Yearmonth)) +
+  geom_line(data = data_cpue_per_month,
+            aes(x = Yearmonth, y = CPUE_BetN, group=1), 
+            color = "darkred") +
+  labs(title = paste("CPUE of", highest_species, "in 2024"),
+       x = "Month",
+       y = "CPUE (bars) / Total Catch (line, scaled)") +
+  theme_minimal()
+
+q <- ggplot(data_cpue_per_month, aes(x = Yearmonth)) +
+   geom_line(data = highest_species_data, aes(x = Yearmonth, y = Catch_KG, group=1), 
+            color = "darkblue") +
+  labs(title = paste("Total Catch of", highest_species, "in 2024"),
+       x = "Month",
+       y = "CPUE (bars) / Total Catch (line, scaled)") +
+  theme_minimal()
+
+
+p/q
+
+```
+
+Q: Can we map CPUE for that species?
+
+```{r map-cpue, message=FALSE, warning=FALSE}
+
+# summarise data spatially and per month for the key species
+
+data_for_map <- data |>
+  group_by(Latitude, Longitude, Yearmonth) |>
+  summarise(
+    Hooks = sum(Hooks, na.rm = TRUE),
+    CPUE_BetN = (sum(BetN, na.rm = TRUE) / sum(Hooks, na.rm = TRUE)) * 1000, # CPUE per 1000 hooks
+    CPUE_AlbN = (sum(AlbN, na.rm = TRUE) / sum(Hooks, na.rm = TRUE)) * 1000,
+    CPUE_YftN = (sum(YftN, na.rm = TRUE) / sum(Hooks, na.rm = TRUE)) * 1000,
+    CPUE_SkjN = (sum(SkjN, na.rm = TRUE) / sum(Hooks, na.rm = TRUE)) * 1000
+  ) |>  
+  ungroup()
+
+
+# pivot cpue species to long format
+data_for_map <- data_for_map |>
+  select(Latitude, Longitude, Yearmonth, starts_with("CPUE_")) |>
+  pivot_longer(
+    cols = starts_with("CPUE_"), 
+    names_to = "Species", 
+    values_to = "CPUE",
+    names_prefix = "CPUE_"
+  )
+
+# Calculate limits from your data
+lon_range <- range(data_for_map$Longitude, na.rm = TRUE)
+lat_range <- range(data_for_map$Latitude, na.rm = TRUE)
+
+# Optional: add a buffer (e.g., 5% padding)
+lon_buffer <- diff(lon_range) * 1
+lat_buffer <- diff(lat_range) * 0.1
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+p <- ggplot() +
+  geom_sf(data = world, fill = "grey90", color = "grey60", size = 0.2) +
+  geom_tile(data = data_for_map |>
+                     group_by(Latitude, Longitude, Yearmonth) |>
+                     summarise(CPUE = sum(CPUE, na.rm = TRUE)) |>
+                     filter(CPUE > 5), 
+            aes(Longitude, Latitude, fill = CPUE)) +
+  scale_fill_distiller(palette = 'Spectral') +
+  xlab('Longitude') + ylab('Latitude') + labs(fill = 'CPUE') +
+  theme_bw() +
+  theme(axis.text = element_text(size = 8), 
+        legend.text = element_text(size = 8), 
+        legend.title = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.background = element_rect(fill = 'white'), 
+        strip.text = element_text(size = 8),
+        axis.title = element_text(size = 10), 
+        title = element_text(size = 10)) +
+  coord_sf(xlim = lon_range + c(-lon_buffer, lon_buffer), 
+           ylim = lat_range + c(-lat_buffer, lat_buffer), 
+           expand = FALSE) +
+  ggtitle('Spatial patterns in catch')
+
+p
+
+```
+Q:  can I facet the map by month? And then, by species?
+
+```{r map-cpue-faceted, message=FALSE, warning=FALSE}
+p + facet_wrap(~ Yearmonth)
+
+```
+
+```{r map-cpue-faceted-species, message=FALSE, warning=FALSE}
+q <- ggplot() +
+  geom_sf(data = world, fill = "grey90", color = "grey60", size = 0.2) +
+  geom_tile(data = data_for_map |>
+            filter(CPUE > 5), aes(Longitude, Latitude, fill = CPUE)) +
+  scale_fill_distiller(palette = 'Spectral') +
+  xlab('Longitude') + ylab('Latitude') + labs(fill = 'CPUE') +
+  theme_bw() +
+  theme(axis.text = element_text(size = 8), 
+        legend.text = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.title = element_text(size = 8),
+        strip.background = element_rect(fill = 'white'), 
+        strip.text = element_text(size = 8),
+        axis.title = element_text(size = 10), 
+        title = element_text(size = 10)) +
+  facet_wrap(~ Species) +
+  coord_sf(xlim = lon_range + c(-lon_buffer, lon_buffer), 
+           ylim = lat_range + c(-lat_buffer, lat_buffer), 
+           expand = FALSE) +
+  ggtitle('Spatial patterns in catch')
+q
+
+```
+
