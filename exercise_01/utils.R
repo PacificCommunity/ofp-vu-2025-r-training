@@ -20,7 +20,7 @@ generate_token <- function(user_name, country_code){
       "https://www.spc.int/ofp/tufman2api/api/ApiAccess/GetToken",
       "-H", "Content-Type: application/json",
       "-H", paste0("TufInstance: ", country_code),
-      "-H", paste0(' "TufUser: ", user_name, "'),
+      "-H", paste0("TufUser: ", user_name),
       "-d", sprintf('{"userEmail": "%s", "password": "%s"}', user_name, Sys.getenv("TUF_PASSWORD"))
     )
   )
